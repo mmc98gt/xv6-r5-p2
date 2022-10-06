@@ -180,3 +180,14 @@ filewrite(struct file *f, uint64 addr, int n)
   return ret;
 }
 
+int
+mmap(void *addr, uint64 length, int prot, int flag, int fd)
+{
+  return 0;
+}
+
+int
+nunmap(uint64 addr, uint64 length)
+{
+  return 0;
+}
