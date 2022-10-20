@@ -5,6 +5,8 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "vma.h"
+
 
 struct spinlock tickslock;
 uint ticks;
@@ -75,13 +77,42 @@ usertrap(void)
     // page fault
     // pido una pagina con kalloc
 
-    //
+    //iterate vmas and check if the fault address is in any of them
+    struct vma * vma;
+    if( (vma = checkaddr(r_sepc())) == 0)
+    {
+      //if the address is not in any of the vmas, kill the process
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      setkilled(p);
+      exit(-1);
+    }
+    else
+    {
+      //if the address is in one of the vmas, give the process a page
+      char *mem = kalloc();
+      if(mem == 0)
+      {
+        printf("usertrap(): out of memory\n");
+        setkilled(p);
+        exit(-1);
+      }
+      memset(mem, 0, PGSIZE);
+
+      uint64 dir = PGROUNDDOWN(vma->vm_file->off + r_stval() - PGROUNDDOWN(r_stval()));
+      if(mappages(p->pagetable, dir, PGSIZE, (uint64)mem, vma->vm_prot) != 0)
+      {
+        printf("usertrap(): out of memory (2)\n");
+        setkilled(p);
+        exit(-1);
+      }
+    }
   }
    else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);
-  }
+  
 
   if(killed(p))
     exit(-1);

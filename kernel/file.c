@@ -12,6 +12,7 @@
 #include "file.h"
 #include "stat.h"
 #include "proc.h"
+#include "vma.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -19,10 +20,20 @@ struct {
   struct file file[NFILE];
 } ftable;
 
+// Struct to create a lock for vmalist
+struct {
+  struct spinlock lock;
+  struct vma vmas[NPROC*2];
+} vma_list;
+
 void
 fileinit(void)
 {
   initlock(&ftable.lock, "ftable");
+}
+void vmalistinit(void)
+{
+  initlock(&vma_list.lock, "vma_list");
 }
 
 // Allocate a file structure.
@@ -180,11 +191,60 @@ filewrite(struct file *f, uint64 addr, int n)
   return ret;
 }
 
+struct vma*
+vmaalloc(void)
+{
+  struct vma *v;
+
+  acquire(&vma_list.lock);
+  for(v = vma_list.vmas; v < vma_list.vmas + NPROC*2; v++){
+    if(v->vm_ref == 0){
+      v->vm_ref = 1;
+      release(&vma_list.lock);
+      return v;
+    }
+  }
+  release(&vma_list.lock);
+  return 0;
+}
+struct vma*
+checkaddr(uint64 addr)
+{
+  struct proc *p = myproc();
+  struct vma *v;
+  acquire(&vma_list.lock);
+  for(v = vma_list.vmas; v < vma_list.vmas + NPROC*2; v++){
+    if(v->vm_ref == 1 && v->vm_start <= addr && v->vm_end >= addr){
+      release(&vma_list.lock);
+      return v;
+    }
+  }
+  release(&vma_list.lock);
+  return 0;
+}
 int
 mmap(void *addr, uint64 length, int prot, int flag, int fd)
 {
-  return 0;
+  
   //guardar informacion en el VMA
+  //instance of VMA
+  struct vma *vma;
+  //instance of file
+  struct file *f;
+  //get file from fd
+  if(fd <0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+    return -1;
+  //puting args in vma
+  if((vma = vmaalloc()) == 0)
+    return -1;
+
+  vma->vm_start = addr;
+  vma->vm_end = addr + length;
+  vma->vm_prot = prot;
+  vma->vm_flags = flag;
+  vma->vm_file = f;
+  vma->vm_next = 0;
+  return 1;
 }
 
 int

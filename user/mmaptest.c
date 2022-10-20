@@ -4,6 +4,7 @@
 #include "kernel/stat.h"
 #include "kernel/riscv.h"
 #include "kernel/fs.h"
+#include "kernel/vma.h"
 #include "user/user.h"
 
 void mmap_test();
