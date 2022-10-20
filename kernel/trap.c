@@ -67,7 +67,17 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  } else 
+  if(r_scause() == 13 || r_scause() == 15){
+    // ver que vma tiene el proceso, si la direccion esta dentro de alguno de los vma del proceso entonces le damos una pagina al proceso.
+    // si no esta dentro de ninguno de los vma del proceso entonces se mata el proceso.
+    // el tamaño del proceso no se toca, solo se le da una pagina al proceso.
+    // page fault
+    // pido una pagina con kalloc
+
+    //
+  }
+   else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);

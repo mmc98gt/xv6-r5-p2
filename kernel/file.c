@@ -184,6 +184,7 @@ int
 mmap(void *addr, uint64 length, int prot, int flag, int fd)
 {
   return 0;
+  //guardar informacion en el VMA
 }
 
 int
