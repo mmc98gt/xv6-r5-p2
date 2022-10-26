@@ -208,9 +208,9 @@ vmaalloc(void)
   return 0;
 }
 struct vma*
-checkaddr(uint64 addr)
+checkaddr(void* addr)
 {
-  struct proc *p = myproc();
+  // struct proc *p = myproc();
   struct vma *v;
   acquire(&vma_list.lock);
   for(v = vma_list.vmas; v < vma_list.vmas + NPROC*2; v++){
@@ -239,7 +239,7 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd)
     return -1;
 
   vma->vm_start = addr;
-  vma->vm_end = addr + length;
+  vma->vm_end = (struct vma*)addr + length;
   vma->vm_prot = prot;
   vma->vm_flags = flag;
   vma->vm_file = f;

@@ -5,11 +5,6 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-#include "fs.h"
-#include "sleeplock.h"
-#include "file.h"
-#include "vma.h"
-
 
 struct spinlock tickslock;
 uint ticks;
@@ -38,9 +33,6 @@ trapinithart(void)
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
 //
-
-
-
 void
 usertrap(void)
 {
@@ -75,50 +67,12 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  }  else if(r_scause() == 13 || r_scause() == 15){
-    // ver que vma tiene el proceso, si la direccion esta dentro de alguno de los vma del proceso entonces le damos una pagina al proceso.
-    // si no esta dentro de ninguno de los vma del proceso entonces se mata el proceso.
-    // el tamaño del proceso no se toca, solo se le da una pagina al proceso.
-    // page fault
-    // pido una pagina con kalloc
-
-    //iterate vmas and check if the fault address is in any of them
-    struct vma * vma;
-    if( (vma = checkaddr((void*)r_sepc())) == 0)
-    {
-      //if the address is not in any of the vmas, kill the process
-      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-      setkilled(p);
-      exit(-1);
-    }
-    else
-    {
-      //if the address is in one of the vmas, give the process a page
-      char *mem = kalloc();
-      if(mem == 0)
-      {
-        printf("usertrap(): out of memory\n");
-        setkilled(p);
-        exit(-1);
-      }
-      memset(mem, 0, PGSIZE);
-
-      uint64 dir = PGROUNDDOWN(vma->vm_file->off + r_stval() - PGROUNDDOWN(r_stval()));
-      if(mappages(p->pagetable, dir, PGSIZE, (uint64)mem, vma->vm_prot) != 0)
-      {
-        printf("usertrap(): out of memory (2)\n");
-        setkilled(p);
-        exit(-1);
-      }
-    }
-  }
-   else {
+  } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);
-  
-   }
+  }
+
   if(killed(p))
     exit(-1);
 
@@ -127,7 +81,6 @@ usertrap(void)
     yield();
 
   usertrapret();
-  
 }
 
 //
@@ -265,4 +218,3 @@ devintr()
     return 0;
   }
 }
-
