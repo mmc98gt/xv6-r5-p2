@@ -104,6 +104,19 @@ usertrap(void)
       }
       memset(mem, 0, PGSIZE);
 
+      // unlock inode
+      ilock(vma->vm_file->ip);
+      
+      
+
+      // read the file into the page
+      int bytesRead = readi(vma->vm_file->ip, 0,(uint64) mem, vma->vm_file->off, PGSIZE);
+      if(!bytesRead){
+        printf("usertrap(): coudn't read file\n");
+        setkilled(p);
+        exit(-1);
+      }
+      // alloc pages
       uint64 dir = PGROUNDDOWN(vma->vm_file->off + r_stval() - PGROUNDDOWN(r_stval()));
       if(mappages(p->pagetable, dir, PGSIZE, (uint64)mem, vma->vm_prot) != 0)
       {

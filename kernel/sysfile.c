@@ -507,6 +507,8 @@ sys_pipe(void)
 uint64
 sys_mmap(void)
 {
+  
+
   return 0;
 }
 

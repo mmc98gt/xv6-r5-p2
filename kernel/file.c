@@ -223,18 +223,25 @@ checkaddr(void* addr)
   return 0;
 }
 int
-mmap(void *addr, uint64 length, int prot, int flag, int fd)
+mmap(int mode ,void *addr, uint64 length, int prot, int flag, int fd, int off)
 {
   
+  
+
   //guardar informacion en el VMA
   //instance of VMA
   struct vma *vma;
+  p->vmas[p->numVmas];
+  p->numVmas++;
   //instance of file
   struct file *f;
   //get file from fd
   if(fd <0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
     return -1;
   //puting args in vma
+  if(off < 0)
+    return -1;
+  f->off = off;
   if((vma = vmaalloc()) == 0)
     return -1;
 
@@ -243,7 +250,21 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd)
   vma->vm_prot = prot;
   vma->vm_flags = flag;
   vma->vm_file = f;
+  // increment ref count
+  f->ref++;
   vma->vm_next = 0;
+
+  // calculing addr
+  struct proc* p = myproc();
+  if(!mode){
+    if(p ->numVmas){
+      uint64 aux = p->trapframe + sizeof(struct trapframe);
+      addr = (void*) aux;  
+    }
+    addr = p->lastDirVma;
+  }
+
+  
   return 1;
 }
 
