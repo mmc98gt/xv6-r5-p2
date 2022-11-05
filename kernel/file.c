@@ -227,22 +227,25 @@ getFreeVMA()
   return (struct vma *) 0;
 }
 
-uint64
-mmap(void *addr, uint64 length, int prot, int flag, int fd)
+void*
+mmap(void *addr, uint64 length, int prot, int flag, int fd, int offset)
 {
+
+  //test
+  printf("entra a mmap \n");
 
   //obtencion del proceso actual
   struct proc *p = myproc();
 
   //comprobar flags:
   if(flag == MAP_SHARED && (p->ofile[fd]->writable !=1 || p->ofile[fd]->readable !=1))
-    return 1;
+    return (void *)1;
   
   //comprobar si hay mma libre;
   acquire(&p->lock);
   if(p->numVmas == VMA_MAX){
     release(&p->lock);
-    return 2;
+    return (void *)2;
   }
 
   //declaracion de variables aux
@@ -266,12 +269,12 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd)
     {
       //si hay una vma anterior y esta en una posicion no valida
       if(((anterior != 0) && (anterior->vm_end + p_size) > TOP_ADDRESS) || ((anterior == 0) && START_ADDRESS + p_size > TOP_ADDRESS))
-        return 3;
+        return (void *)3;
 
       //no quedan vmas libres
       if((vma = getFreeVMA()) == (struct vma *) 0){
         release(&p->lock);
-        return 4;
+        return (void *)4;
       }
 
       if(anterior == 0){
@@ -290,7 +293,7 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd)
       //buscar una vma libre
       if((vma = getFreeVMA()) == (struct vma *) 0){
         release(&p->lock);
-        return 6;
+        return (void *)6;
       }
       
       //si hay una libre, actualizamos las variables del bucle y vamos a la parte de alloc
@@ -309,7 +312,7 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd)
   }
 
   //no se puede reservar la vma
-  return 5;
+  return (void *)5;
 
   alloc:
     vma->vm_len = length;
@@ -325,12 +328,14 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd)
   p->numVmas++;
 
   release(&p->lock);
-  return vma->vm_start;  
+  return (void *)vma->vm_start;  
 
 }
 
 int
 nunmap(uint64 addr, uint64 length)
 {
+  printf("nunpad entra\n");
+
   return 0;
 }

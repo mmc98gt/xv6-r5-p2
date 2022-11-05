@@ -15,6 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "vma.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -504,12 +505,27 @@ sys_pipe(void)
   return 0;
 }
 
-uint64
+void*
 sys_mmap(void)
 {
-  
+  uint64 length, prot, flag, fd, offset;
 
-  return 0;
+  argaddr(1, &length); 
+  argaddr(2, &prot);
+  argaddr(3, &flag); 
+  argaddr(4, &fd);
+  argaddr(5, &offset);
+
+
+  if(prot != PROT_READ && prot != PROT_WRITE && prot != PROT_READ_WRITE)
+    return (void *)-1;
+  if(flag != MAP_PRIVATE && flag != MAP_SHARED)
+    return (void *)-1;
+  if(fd < 0 || fd >= NOFILE)
+    return (void *)-1;
+
+  return mmap(0, length, prot, flag, fd, offset);
+
 }
 
 
