@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/kernel/kernel",
+            "cwd": "${workspaceRoot}",
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            "miDebuggerArgs": "--cd=${workspaceRoot} -ex \"source .gdbinit\"",
+            "launchCompleteCommand": "None",
+            "customLaunchSetupCommands": [],
+            "MIMode": "gdb",
+            "stopAtEntry": true,
+            "logging": {
+                "engineLogging": true
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            // No funciona pues se queda esperando a que la tarea (xv6) finalice
+            // Hay que lanzarlo por separado manualmente
+            //"preLaunchTask": "launch-xv6-gdb",
+            "postDebugTask": "kill-xv6"
+        }
+    ]
+}
