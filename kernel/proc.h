@@ -81,6 +81,9 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+#define VMA_PROCESS 4
+
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -105,7 +108,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  struct vma * vmas[4];
+  struct vma * vmas;
   int numVmas;
   void * lastDirVma;
 };

@@ -23,7 +23,7 @@ struct {
 // Struct to create a lock for vmalist
 struct {
   struct spinlock lock;
-  struct vma vmas[NPROC*2];
+  struct vma vmas[VMA_MAX];
 } vma_list;
 
 void
@@ -197,7 +197,7 @@ vmaalloc(void)
   struct vma *v;
 
   acquire(&vma_list.lock);
-  for(v = vma_list.vmas; v < vma_list.vmas + NPROC*2; v++){
+  for(v = vma_list.vmas; v < vma_list.vmas + VMA_MAX; v++){
     if(v->vm_ref == 0){
       v->vm_ref = 1;
       release(&vma_list.lock);
@@ -207,65 +207,126 @@ vmaalloc(void)
   release(&vma_list.lock);
   return 0;
 }
+
+
 struct vma*
-checkaddr(void* addr)
+getFreeVMA()
 {
-  // struct proc *p = myproc();
-  struct vma *v;
+  //buscar una vma libre
   acquire(&vma_list.lock);
-  for(v = vma_list.vmas; v < vma_list.vmas + NPROC*2; v++){
-    if(v->vm_ref == 1 && v->vm_start <= addr && v->vm_end >= addr){
+  for(int i = 0;i<VMA_MAX;i++)
+  {
+    if(vma_list.vmas[i].use == 0)
+    {
+      vma_list.vmas[i].use = 1;
       release(&vma_list.lock);
-      return v;
+      return &vma_list.vmas[i]; 
     }
   }
   release(&vma_list.lock);
-  return 0;
+  return (struct vma *) 0;
 }
-int
-mmap(int mode ,void *addr, uint64 length, int prot, int flag, int fd, int off)
+
+uint64
+mmap(void *addr, uint64 length, int prot, int flag, int fd)
 {
+
+  //obtencion del proceso actual
+  struct proc *p = myproc();
+
+  //comprobar flags:
+  if(flag == MAP_SHARED && (p->ofile[fd]->writable !=1 || p->ofile[fd]->readable !=1))
+    return 1;
   
-  
-
-  //guardar informacion en el VMA
-  //instance of VMA
-  struct vma *vma;
-  p->vmas[p->numVmas];
-  p->numVmas++;
-  //instance of file
-  struct file *f;
-  //get file from fd
-  if(fd <0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-    return -1;
-  //puting args in vma
-  if(off < 0)
-    return -1;
-  f->off = off;
-  if((vma = vmaalloc()) == 0)
-    return -1;
-
-  vma->vm_start = addr;
-  vma->vm_end = (struct vma*)addr + length;
-  vma->vm_prot = prot;
-  vma->vm_flags = flag;
-  vma->vm_file = f;
-  // increment ref count
-  f->ref++;
-  vma->vm_next = 0;
-
-  // calculing addr
-  struct proc* p = myproc();
-  if(!mode){
-    if(p ->numVmas){
-      uint64 aux = p->trapframe + sizeof(struct trapframe);
-      addr = (void*) aux;  
-    }
-    addr = p->lastDirVma;
+  //comprobar si hay mma libre;
+  acquire(&p->lock);
+  if(p->numVmas == VMA_MAX){
+    release(&p->lock);
+    return 2;
   }
 
-  
-  return 1;
+  //declaracion de variables aux
+  uint64 p_size;
+  struct vma *vma;
+  struct vma *actual;
+  struct vma *anterior;
+
+  //redondeo de la memoria y actualizar variables aux;
+  p_size = PGROUNDUP(length);
+  vma = 0; //0 es que no hay vma
+  actual = p->vmas;
+  anterior = 0; //inicialmente no hay vma anteriores
+
+  //recoriendo las vmas de los procesos
+  int i = 0;
+  for(i=0;i<=VMA_PROCESS;i++)
+  {
+    //el proceso no tiene vmas asociadas
+    if(actual==0)
+    {
+      //si hay una vma anterior y esta en una posicion no valida
+      if(((anterior != 0) && (anterior->vm_end + p_size) > TOP_ADDRESS) || ((anterior == 0) && START_ADDRESS + p_size > TOP_ADDRESS))
+        return 3;
+
+      //no quedan vmas libres
+      if((vma = getFreeVMA()) == (struct vma *) 0){
+        release(&p->lock);
+        return 4;
+      }
+
+      if(anterior == 0){
+        vma->vm_start = START_ADDRESS;
+        vma->vm_end = START_ADDRESS + p_size;
+      }else{
+        anterior->vm_next = vma;
+        vma->vm_start = anterior->vm_end;
+        vma->vm_end =  anterior->vm_end + p_size;
+      }
+      vma->vm_next = 0;
+      goto alloc;
+
+    }else if((anterior != 0) && anterior->vm_end + p_size <= actual->vm_start){ //hay una vma anterior y valid
+      
+      //buscar una vma libre
+      if((vma = getFreeVMA()) == (struct vma *) 0){
+        release(&p->lock);
+        return 6;
+      }
+      
+      //si hay una libre, actualizamos las variables del bucle y vamos a la parte de alloc
+      anterior->vm_next = vma;
+      vma->vm_next = actual;
+      vma->vm_start = anterior->vm_end;
+      vma->vm_end = anterior->vm_end + p_size;
+      goto alloc;
+
+    }
+
+    //actualizando variables del bucle
+    anterior = actual;
+    actual = actual->vm_next;
+
+  }
+
+  //no se puede reservar la vma
+  return 5;
+
+  alloc:
+    vma->vm_len = length;
+    vma->vm_prot = prot;
+    vma->vm_file = p->ofile[fd];
+    vma->vm_flags = flag;
+    vma->vm_firstDir = vma->vm_start;
+    vma->vm_offset = 0;
+
+  p->ofile[fd]->ref++;
+  if(!p->numVmas)
+    p->vmas = vma;
+  p->numVmas++;
+
+  release(&p->lock);
+  return vma->vm_start;  
+
 }
 
 int

@@ -75,56 +75,53 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  }  else if(r_scause() == 13 || r_scause() == 15){
+  }  else if(r_scause() == 13 || r_scause() == 15 || r_scause() == 12){
     // ver que vma tiene el proceso, si la direccion esta dentro de alguno de los vma del proceso entonces le damos una pagina al proceso.
     // si no esta dentro de ninguno de los vma del proceso entonces se mata el proceso.
     // el tamaño del proceso no se toca, solo se le da una pagina al proceso.
     // page fault
     // pido una pagina con kalloc
 
-    //iterate vmas and check if the fault address is in any of them
-    struct vma * vma;
-    if( (vma = checkaddr((void*)r_sepc())) == 0)
-    {
-      //if the address is not in any of the vmas, kill the process
-      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-      setkilled(p);
+    //miramos si tiene alguna vma
+    if(p->numVmas == 0){
+      p->killed = 1;
       exit(-1);
     }
-    else
+
+    uint64 addr = (uint64) r_stval(); //direcion causante
+    struct vma *actual = p->vmas;
+
+    //buscamos la vma que ha generando el fallo
+    int i = 0;
+    for(i = 0;i<p->numVmas;i++)
     {
-      //if the address is in one of the vmas, give the process a page
-      char *mem = kalloc();
-      if(mem == 0)
-      {
-        printf("usertrap(): out of memory\n");
-        setkilled(p);
-        exit(-1);
-      }
-      memset(mem, 0, PGSIZE);
-
-      // unlock inode
-      ilock(vma->vm_file->ip);
-      
-      
-
-      // read the file into the page
-      int bytesRead = readi(vma->vm_file->ip, 0,(uint64) mem, vma->vm_file->off, PGSIZE);
-      if(!bytesRead){
-        printf("usertrap(): coudn't read file\n");
-        setkilled(p);
-        exit(-1);
-      }
-      // alloc pages
-      uint64 dir = PGROUNDDOWN(vma->vm_file->off + r_stval() - PGROUNDDOWN(r_stval()));
-      if(mappages(p->pagetable, dir, PGSIZE, (uint64)mem, vma->vm_prot) != 0)
-      {
-        printf("usertrap(): out of memory (2)\n");
-        setkilled(p);
-        exit(-1);
-      }
+      if(addr >= actual->vm_start && addr < actual->vm_end)break;
+      actual = actual->vm_next;
     }
+
+    //hay mas vmas de las permitidas
+    if(i == p->numVmas){
+      p->killed = 1;
+      exit(-1);
+    }
+
+    //reservamos la memoria
+    char *pgAddr = kalloc();
+    if(!pgAddr) p->killed=1;
+
+    memset(pgAddr, 0 ,PGSIZE);
+
+    if(mappages(p->pagetable, addr, PGSIZE, (uint64)pgAddr, actual->vm_prot | PTE_U) != 0)
+    {
+      kfree(pgAddr);
+      p->killed = 1;
+      exit(-1);
+    }
+
+    ilock(actual->vm_file->ip);
+    readi(actual->vm_file->ip, 1, PGROUNDDOWN(addr), PGROUNDDOWN(addr) - actual->vm_start, PGSIZE);
+    iunlock(actual->vm_file->ip);
+
   }
    else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
