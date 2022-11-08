@@ -15,6 +15,10 @@
 //direcion maxima de mapeo
 #define TOP_ADDRESS 0x3FFFFFDFFF 
 
+//fallo en mmap
+#define MAP_FAILED ((char *) -1)
+
+
 // the struct of a vma.
 struct vma {
 // vma start address
