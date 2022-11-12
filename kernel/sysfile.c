@@ -532,5 +532,15 @@ sys_mmap(void)
 uint64
 sys_munmap(void)
 {
-  return 0;
+  uint64 length, addr;
+
+  argaddr(0, &addr);
+  argaddr(1, &length);
+  
+  begin_op();
+  int e = munmap((void *)addr, length);
+  end_op();
+
+  return e;
+
 }

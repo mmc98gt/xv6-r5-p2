@@ -333,10 +333,109 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd, int offset)
 
 }
 
+void freeVma(struct vma *anterior, struct vma *actual, struct proc *p){
+  
+  acquire(&vma_list.lock);
+
+  //Organize the linked list of vmas
+  if(anterior == 0)
+  {
+    if(actual->vm_next == 0) p->vmas = 0;
+    else p->vmas = actual->vm_next;
+  }else if(actual->vm_next != 0) anterior->vm_next = actual->vm_next;
+    else anterior->vm_next = 0;
+
+  actual->vm_file->ref--;  //Reduce references to file 
+  actual->use = 0;
+  actual->vm_file = 0;
+  actual->vm_firstDir = 0;
+  actual->vm_start = 0;
+  actual->vm_end = 0;   
+  actual->vm_offset = 0;
+  actual->vm_next = 0;
+  actual->vm_prot = 0;
+  actual->vm_flags = 0;
+  p->numVmas--;
+
+  release(&vma_list.lock);
+
+}
+
 int
-nunmap(uint64 addr, uint64 length)
+munmap(void *addr, uint64 length)
 {
+  
   printf("nunpad entra\n");
+
+  // tomamos la informacion del proceso actual
+  struct proc *p = myproc(); 
+  acquire(&p->lock);
+  struct vma *actual = p->vmas;
+  struct vma *anterior = 0;
+  uint64 addrU= (uint64)addr;
+
+  //Comprobamos que la dirrecion sea de una vma
+  int i = 0;
+  for(i = 0; i<p->numVmas; i++)
+  {
+    if( addrU+length >= actual->vm_start && addrU+length <= actual->vm_end
+     && addrU >= actual->vm_start && addrU < actual->vm_end ) break;
+    
+    anterior = actual;
+    actual = actual->vm_next;
+  }
+
+  //hemos pasado todas las vmas y no se ha encontrado ninguna
+  if(i == p->numVmas){
+    release(&p->lock);
+    return -1; 
+  }
+
+  // variables para el desmapeo
+  pte_t *pte;
+  int escritos = 0;
+  int aux = 0;
+
+  for(i = 0; i < PGROUNDUP(length)/PGSIZE; i++)
+  {
+    pte =  walk(p->pagetable, PGROUNDDOWN(addrU+i*PGSIZE), 0);
+    
+    //Check if the page is mapped
+    if(*pte & PTE_V)
+    {
+      //Whether flag MAP_SHARED was established, check if the page has the dirty bit and if it has to write on disk
+      if( (*pte & PTE_D) && actual->vm_flags == MAP_SHARED)
+      {
+        ilock(actual->vm_file->ip);
+        escritos = PGSIZE*(i+1) - actual->vm_file->ip->size;
+        //Set the correct data size to write on disk
+
+        if(escritos > 0) aux = 1;
+        else escritos = PGSIZE;
+
+        //Write on disk the modified data
+        if(writei(actual->vm_file->ip, 1, PGROUNDDOWN(addrU+i*PGSIZE), PGROUNDDOWN(addrU+i*PGSIZE)-actual->vm_firstDir, escritos) == -1)
+        {
+          iunlock(actual->vm_file->ip);  
+          release(&p->lock);
+          return -1;
+        }
+
+        iunlock(actual->vm_file->ip);
+      }
+
+      uvmunmap(p->pagetable, PGROUNDDOWN(addrU+i*PGSIZE), 1, 1);
+        if(aux) break;
+    }
+  }
+
+  if(actual->vm_start+PGROUNDUP(length) == actual->vm_end) freeVma(anterior,actual,p);
+  else if(actual->vm_start == addrU) actual->vm_start = actual->vm_start+PGROUNDUP(length); //Set the new init address when munmap is at the beginning  
+  else actual->vm_end = PGROUNDDOWN(addrU); //Set the new end address when munmap is at the end
+
+  release(&p->lock);
+  return 0;
+
 
   return 0;
 }
