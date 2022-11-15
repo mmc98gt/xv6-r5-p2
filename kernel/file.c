@@ -396,24 +396,25 @@ munmap(void *addr, uint64 length)
   int escritos = 0;
   int aux = 0;
 
+  //recorre las enstradas de la tabla de paginas
   for(i = 0; i < PGROUNDUP(length)/PGSIZE; i++)
   {
     pte =  walk(p->pagetable, PGROUNDDOWN(addrU+i*PGSIZE), 0);
     
-    //Check if the page is mapped
+    // la pagina esta mapeada
     if(*pte & PTE_V)
     {
-      //Whether flag MAP_SHARED was established, check if the page has the dirty bit and if it has to write on disk
+      //Comprueba si el mapeo es compartido y que este el bit de sucio activo
       if( (*pte & PTE_D) && actual->vm_flags == MAP_SHARED)
       {
         ilock(actual->vm_file->ip);
         escritos = PGSIZE*(i+1) - actual->vm_file->ip->size;
-        //Set the correct data size to write on disk
-
+        
+        // Selecionamos el tamño a escribir
         if(escritos > 0) aux = 1;
         else escritos = PGSIZE;
 
-        //Write on disk the modified data
+        //Escribimos en el disco los nuevos datos
         if(writei(actual->vm_file->ip, 1, PGROUNDDOWN(addrU+i*PGSIZE), PGROUNDDOWN(addrU+i*PGSIZE)-actual->vm_firstDir, escritos) == -1)
         {
           iunlock(actual->vm_file->ip);  
@@ -430,12 +431,10 @@ munmap(void *addr, uint64 length)
   }
 
   if(actual->vm_start+PGROUNDUP(length) == actual->vm_end) freeVma(anterior,actual,p);
-  else if(actual->vm_start == addrU) actual->vm_start = actual->vm_start+PGROUNDUP(length); //Set the new init address when munmap is at the beginning  
-  else actual->vm_end = PGROUNDDOWN(addrU); //Set the new end address when munmap is at the end
+  else if(actual->vm_start == addrU) actual->vm_start = actual->vm_start+PGROUNDUP(length); //Colocamos una nueva direcion de comienzo  
+  else actual->vm_end = PGROUNDDOWN(addrU); //Colocamos una nueva direcion de final
 
   release(&p->lock);
   return 0;
 
-
-  return 0;
 }

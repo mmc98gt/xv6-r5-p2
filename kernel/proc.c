@@ -5,6 +5,10 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "vma.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
 
 struct cpu cpus[NCPU];
 
@@ -358,6 +362,14 @@ exit(int status)
       fileclose(f);
       p->ofile[fd] = 0;
     }
+  }
+
+  //desmapear vmas;
+  struct vma *actual = p->vmas;
+  while( p->vmas > 0 )
+  {
+    actual = p->vmas;
+    munmap((void *)actual->vm_start, actual->vm_end - actual->vm_start);
   }
 
   begin_op();
