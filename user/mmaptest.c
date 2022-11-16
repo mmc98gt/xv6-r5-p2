@@ -247,6 +247,7 @@ fork_test(void)
   if(*(p1+PGSIZE) != 'A')
     err("fork mismatch (1)");
 
+
   if((pid = fork()) < 0)
     err("fork");
   if (pid == 0) {
@@ -255,13 +256,17 @@ fork_test(void)
     exit(0); // tell the parent that the mapping looks OK.
   }
 
-  int status = -1;
+  //printf("p1: %p, p2: %p\n",p1,p2);
+  int status = 1;
   wait(&status);
+  printf("status: %d\n",status);
 
   if(status != 0){
     printf("fork_test failed\n");
     exit(1);
   }
+
+  printf("hola weradfadsfa \n");
 
   // check that the parent's mappings are still there.
   _v1(p1);

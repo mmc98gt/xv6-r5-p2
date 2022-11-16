@@ -41,7 +41,10 @@ struct vma {
     struct vma *vm_next;
 // vma's file
     struct file *vm_file;
-// vma's use or not
+// vma's is on use 
     int use;
 };
 
+extern struct vma vmas[VMA_MAX];
+
+extern struct spinlock vmaslock; 

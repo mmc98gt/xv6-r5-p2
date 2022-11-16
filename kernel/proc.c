@@ -19,6 +19,11 @@ struct proc *initproc;
 int nextpid = 1;
 struct spinlock pid_lock;
 
+struct {
+  struct spinlock lock;
+  struct vma vmas[VMA_MAX];
+} vma_listP;
+
 extern void forkret(void);
 static void freeproc(struct proc *p);
 
@@ -253,6 +258,7 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
+  p->vmas = 0;
   p->state = RUNNABLE;
 
   release(&p->lock);
@@ -316,6 +322,47 @@ fork(void)
 
   pid = np->pid;
 
+  //copiar las vmas del padre e incrementar las referencias de los ficheros
+  np->vmas = p->vmas;
+  struct vma *actual =p->vmas;
+  int index = -1;
+  int cont = 0;
+
+  acquire(&vma_listP.lock);
+  for(i = 0;i<p->numVmas;i++)
+  {
+    //buscamos una vma libre
+    while(cont < VMA_MAX && cont != index)
+    {
+      if(vma_listP.vmas[cont].use == 0)
+      {
+        if(i == 0) np->vmas = &vma_listP.vmas[cont];
+        else vma_listP.vmas[index].vm_next = &vma_listP.vmas[cont];
+
+        vma_listP.vmas[cont].vm_start = actual->vm_start;
+        vma_listP.vmas[cont].vm_offset = actual->vm_offset;
+        vma_listP.vmas[cont].vm_end = actual->vm_end;
+        vma_listP.vmas[cont].vm_flags = actual->vm_flags;
+        vma_listP.vmas[cont].vm_prot = actual->vm_prot;
+        vma_listP.vmas[cont].vm_ref = 0;
+        vma_listP.vmas[cont].vm_firstDir = actual->vm_firstDir;
+        vma_listP.vmas[cont].vm_next = 0;
+        vma_listP.vmas[cont].vm_file = actual->vm_file;
+        vma_listP.vmas[cont].vm_file->ref++; 
+        vma_listP.vmas[cont].use = 1;
+        index = cont;
+
+      }else if(cont == VMA_MAX-1){
+        release(&vma_listP.lock);
+        release(&np->lock);
+        return -1;  //No free vma was found
+      }else cont++;
+    }
+    cont++;
+    actual = actual->vm_next;        
+  }
+
+  release(&vma_listP.lock);
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -366,10 +413,10 @@ exit(int status)
 
   //desmapear vmas;
   struct vma *actual = p->vmas;
-  while( p->vmas > 0 )
+  while( p->numVmas > 0 )
   {
     actual = p->vmas;
-    munmap((void *)actual->vm_start, actual->vm_end - actual->vm_start);
+    munmap((void *)actual->vm_start, actual->vm_end - actual->vm_start); //control de fallo
   }
 
   begin_op();

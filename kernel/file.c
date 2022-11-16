@@ -220,6 +220,7 @@ getFreeVMA()
     {
       vma_list.vmas[i].use = 1;
       release(&vma_list.lock);
+      //printf("vma dada: %p\n",&vma_list.vmas[i]);
       return &vma_list.vmas[i]; 
     }
   }
@@ -232,20 +233,25 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd, int offset)
 {
 
   //test
-  printf("entra a mmap \n");
-  printf("addr: %d, leng: %d, prot: %d, flag: %d, fd: %d, off: %d\n\n",addr,length,prot,flag,fd,offset);
+  //printf("entra a mmap \n");
+  //printf("addr: %d, leng: %d, prot: %d, flag: %d, fd: %d, off: %d\n\n",addr,length,prot,flag,fd,offset);
 
   //obtencion del proceso actual
   struct proc *p = myproc();
 
   //comprobar flags:
-  if(flag == MAP_SHARED && (p->ofile[fd]->writable !=1 || p->ofile[fd]->readable !=1))
-    return MAP_FAILED;
+  if (flag & MAP_SHARED) {
+    if ( !(p->ofile[fd]->writable) && (prot & PROT_WRITE) ) {
+      printf("fichero solo lectura, mmap con permisos de escritura\n");
+      return MAP_FAILED;
+    }
+  }
   
-  //comprobar si hay mma libre;
+  //comprobar si hay vma libre para el proceso;
   acquire(&p->lock);
-  if(p->numVmas == VMA_MAX){
+  if(p->numVmas == VMA_PROCESS){
     release(&p->lock);
+    printf("no hay vma libre para este proceso\n");
     return MAP_FAILED;
   }
 
@@ -269,12 +275,15 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd, int offset)
     if(actual==0)
     {
       //si hay una vma anterior y esta en una posicion no valida
-      if(((anterior != 0) && (anterior->vm_end + p_size) > TOP_ADDRESS) || ((anterior == 0) && START_ADDRESS + p_size > TOP_ADDRESS))
+      if(((anterior != 0) && (anterior->vm_end + p_size) > TOP_ADDRESS) || ((anterior == 0) && START_ADDRESS + p_size > TOP_ADDRESS)){
+        printf("posicion no valida\n");
         return MAP_FAILED;
+      }
 
-      //no quedan vmas libres
+      //no quedan vmas libres globales
       if((vma = getFreeVMA()) == (struct vma *) 0){
         release(&p->lock);
+        printf("no hay vma libre en globla\n");
         return MAP_FAILED;
       }
 
@@ -294,14 +303,15 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd, int offset)
       //buscar una vma libre
       if((vma = getFreeVMA()) == (struct vma *) 0){
         release(&p->lock);
+        printf("no hay vma libre en gobla v2\n");
         return MAP_FAILED;
       }
       
       //si hay una libre, actualizamos las variables del bucle y vamos a la parte de alloc
       anterior->vm_next = vma;
-      vma->vm_next = actual;
       vma->vm_start = anterior->vm_end;
       vma->vm_end = anterior->vm_end + p_size;
+      vma->vm_next = actual;
       goto alloc;
 
     }
@@ -313,6 +323,7 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd, int offset)
   }
 
   //no se puede reservar la vma
+  printf("no se ha podido\n");
   return MAP_FAILED;
 
   alloc:
@@ -329,6 +340,7 @@ mmap(void *addr, uint64 length, int prot, int flag, int fd, int offset)
   p->numVmas++;
 
   release(&p->lock);
+  //printf("mmap finaliza: start: %p, end: %p, proc vma: %d, vma total: %d\n",vma->vm_start,vma->vm_end,p->numVmas,i);
   return (void *)vma->vm_start;  
 
 }
@@ -365,7 +377,7 @@ int
 munmap(void *addr, uint64 length)
 {
   
-  printf("nunpad entra\n");
+  //printf("nunpad entra\n");
 
   // tomamos la informacion del proceso actual
   struct proc *p = myproc(); 
