@@ -257,7 +257,7 @@ fork_test(void)
   }
 
   //printf("p1: %p, p2: %p\n",p1,p2);
-  int status = 1;
+  int status = 0;
   wait(&status);
   printf("status: %d\n",status);
 

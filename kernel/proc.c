@@ -398,6 +398,8 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
+  printf("exit status: %d\n",status);
+
 
   if(p == initproc)
     panic("init exiting");
@@ -435,6 +437,7 @@ exit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
+  printf("exit status2: %d\n",p->xstate);
   p->state = ZOMBIE;
 
   release(&wait_lock);

@@ -400,6 +400,7 @@ munmap(void *addr, uint64 length)
   //hemos pasado todas las vmas y no se ha encontrado ninguna
   if(i == p->numVmas){
     release(&p->lock);
+    printf("nunmap: fallo no se encuentra vmas\n");
     return -1; 
   }
 
@@ -431,6 +432,7 @@ munmap(void *addr, uint64 length)
         {
           iunlock(actual->vm_file->ip);  
           release(&p->lock);
+          printf("nunmap: fallo al escribir en disco\n");
           return -1;
         }
 
