@@ -233,12 +233,14 @@ fork_test(void)
   
   // mmap the file twice.
   makefile(f);
-  if ((fd = open(f, O_RDONLY)) == -1)
+  if ((fd = open(f, O_RDWR)) == -1)
     err("open");
   unlink(f);
+   
   char *p1 = mmap(0, PGSIZE*2, PROT_READ, MAP_SHARED, fd, 0);
   if (p1 == MAP_FAILED)
     err("mmap (4)");
+
   char *p2 = mmap(0, PGSIZE*2, PROT_READ, MAP_SHARED, fd, 0);
   if (p2 == MAP_FAILED)
     err("mmap (5)");
@@ -246,7 +248,6 @@ fork_test(void)
   // read just 2nd page.
   if(*(p1+PGSIZE) != 'A')
     err("fork mismatch (1)");
-
 
   if((pid = fork()) < 0)
     err("fork");
@@ -256,17 +257,13 @@ fork_test(void)
     exit(0); // tell the parent that the mapping looks OK.
   }
 
-  //printf("p1: %p, p2: %p\n",p1,p2);
-  int status = 0;
+  int status = -1;
   wait(&status);
-  printf("status: %d\n",status);
 
   if(status != 0){
     printf("fork_test failed\n");
     exit(1);
   }
-
-  printf("hola weradfadsfa \n");
 
   // check that the parent's mappings are still there.
   _v1(p1);

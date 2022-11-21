@@ -324,7 +324,7 @@ fork(void)
 
   //copiar las vmas del padre e incrementar las referencias de los ficheros
   np->vmas = p->vmas;
-  struct vma *actual =p->vmas;
+  struct vma *actual = p->vmas;
   int index = -1;
   int cont = 0;
 
@@ -355,7 +355,7 @@ fork(void)
       }else if(cont == VMA_MAX-1){
         release(&vma_listP.lock);
         release(&np->lock);
-        return -1;  //No free vma was found
+        return -1;  //No hay vmas
       }else cont++;
     }
     cont++;
@@ -367,6 +367,7 @@ fork(void)
 
   acquire(&wait_lock);
   np->parent = p;
+  np->numVmas = p->numVmas;
   release(&wait_lock);
 
   acquire(&np->lock);
@@ -398,8 +399,6 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
-  printf("exit status: %d\n",status);
-
 
   if(p == initproc)
     panic("init exiting");
@@ -437,7 +436,6 @@ exit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
-  printf("exit status2: %d\n",p->xstate);
   p->state = ZOMBIE;
 
   release(&wait_lock);
